@@ -7,7 +7,11 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 STEAM_NEWS_API = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/"
-GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+GEMINI_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+]
+
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 DISCORD_API = "https://discord.com/api/v10"
 STATE_PATH = Path("state.json")
