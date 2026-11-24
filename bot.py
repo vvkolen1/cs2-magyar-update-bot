@@ -2,6 +2,7 @@ import os
 import json
 import re
 import html
+import logging
 import requests
 from pathlib import Path
 from datetime import datetime, timezone
