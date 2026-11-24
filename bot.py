@@ -7,12 +7,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 STEAM_NEWS_API = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/"
-GEMINI_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
+
 ]
 
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 DISCORD_API = "https://discord.com/api/v10"
 STATE_PATH = Path("state.json")
 
@@ -50,86 +47,55 @@ def fetch_news():
 
 
 
+
 def translate(title, body):
-    key = os.environ.get("GEMINI_API_KEY")
+    def translate_text(text):
+        if not text:
+            return ""
 
-    if not key:
-        raise RuntimeError("Hiányzik a GEMINI_API_KEY!")
+        chunks = []
+        words = text.split()
+        current = ""
 
-    prompt = f"""Fordítsd le pontosan és természetes magyarra ezt a hivatalos CS2 hírt.
-Ne találj ki adatot. Őrizd meg a pályaneveket és szakkifejezéseket.
-Kizárólag JSON legyen a válasz:
-{{"title":"magyar cím","body":"magyar fordítás"}}
+        for word in words:
+            if len(current) + len(word) + 1 > 450:
+                chunks.append(current)
+                current = word
+            else:
+                current = f"{current} {word}".strip()
 
-EREDETI CÍM:
-{title}
+        if current:
+            chunks.append(current)
 
-EREDETI SZÖVEG:
-{body[:20000]}
-"""
+        translated_chunks = []
 
-    errors = []
-
-    for model in GEMINI_MODELS:
-        url = f"{GEMINI_API_BASE}{model}:generateContent"
-
-        try:
-            response = requests.post(
-                url,
-                params={"key": key},
-                json={
-                    "contents": [
-                        {
-                            "parts": [
-                                {"text": prompt}
-                            ]
-                        }
-                    ],
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "responseMimeType": "application/json",
-                        "maxOutputTokens": 8192
-                    }
+        for chunk in chunks:
+            response = requests.get(
+                "https://api.mymemory.translated.net/get",
+                params={
+                    "q": chunk,
+                    "langpair": "en|hu"
                 },
-                timeout=90
+                timeout=30
             )
 
             response.raise_for_status()
-
             data = response.json()
 
-            raw = data["candidates"][0]["content"]["parts"][0]["text"]
-            result = json.loads(raw)
+            if data.get("responseStatus") != 200:
+                raise RuntimeError("A fordítási szolgáltatás hibát jelzett.")
 
-            hu_title = result["title"].strip()
-            hu_body = result["body"].strip()
+            translated = data["responseData"]["translatedText"]
+            translated_chunks.append(html.unescape(translated))
 
-            if not hu_title or not hu_body:
-                raise ValueError("Üres Gemini-fordítás!")
+        return " ".join(translated_chunks)
 
-            logging.info("Gemini fordítás sikeres: %s", model)
+    hu_title = translate_text(title)
+    hu_body = translate_text(body)
 
-            return hu_title, hu_body
+    logging.info("Magyar fordítás sikeres.")
 
-        except (
-            requests.RequestException,
-            KeyError,
-            IndexError,
-            ValueError,
-            TypeError
-        ) as error:
-
-            errors.append(f"{model}: {error}")
-
-            logging.warning(
-                "Gemini modell nem működik: %s",
-                model
-            )
-
-    raise RuntimeError(
-        "Egyik Gemini modell sem tudott fordítani: "
-        + " | ".join(errors)
-    )
+    return hu_title, hu_body
 
 
 
