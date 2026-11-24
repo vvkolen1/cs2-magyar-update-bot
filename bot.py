@@ -45,11 +45,16 @@ def fetch_news():
     return r.json().get("appnews", {}).get("newsitems", [])
 
 
+
 def translate(title, body):
-    key = os.environ["GEMINI_API_KEY"]
-    prompt = f"""Fordítsd le teljesen, pontosan és természetes magyarra ezt a hivatalos Counter-Strike 2 Steam-hírt.
-Ne találj ki adatot, és ne hagyj ki fontos részletet. Őrizd meg a pályaneveket,
-játékbeli szakkifejezéseket, verziószámokat és URL-eket. A válasz kizárólag JSON legyen:
+    key = os.environ.get("GEMINI_API_KEY")
+
+    if not key:
+        raise RuntimeError("Hiányzik a GEMINI_API_KEY!")
+
+    prompt = f"""Fordítsd le pontosan és természetes magyarra ezt a hivatalos CS2 hírt.
+Ne találj ki adatot. Őrizd meg a pályaneveket és szakkifejezéseket.
+Kizárólag JSON legyen a válasz:
 {{"title":"magyar cím","body":"magyar fordítás"}}
 
 EREDETI CÍM:
@@ -58,22 +63,70 @@ EREDETI CÍM:
 EREDETI SZÖVEG:
 {body[:20000]}
 """
-    r = requests.post(
-        GEMINI_API,
-        params={"key": key},
-        json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-                "responseMimeType": "application/json"
-            }
-        },
-        timeout=90,
+
+    errors = []
+
+    for model in GEMINI_MODELS:
+        url = f"{GEMINI_API_BASE}{model}:generateContent"
+
+        try:
+            response = requests.post(
+                url,
+                params={"key": key},
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt}
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "responseMimeType": "application/json",
+                        "maxOutputTokens": 8192
+                    }
+                },
+                timeout=90
+            )
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            raw = data["candidates"][0]["content"]["parts"][0]["text"]
+            result = json.loads(raw)
+
+            hu_title = result["title"].strip()
+            hu_body = result["body"].strip()
+
+            if not hu_title or not hu_body:
+                raise ValueError("Üres Gemini-fordítás!")
+
+            logging.info("Gemini fordítás sikeres: %s", model)
+
+            return hu_title, hu_body
+
+        except (
+            requests.RequestException,
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError
+        ) as error:
+
+            errors.append(f"{model}: {error}")
+
+            logging.warning(
+                "Gemini modell nem működik: %s",
+                model
+            )
+
+    raise RuntimeError(
+        "Egyik Gemini modell sem tudott fordítani: "
+        + " | ".join(errors)
     )
-    r.raise_for_status()
-    raw = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    result = json.loads(raw)
-    return result["title"].strip(), result["body"].strip()
+
 
 
 def post_discord(title, body, link, published):
