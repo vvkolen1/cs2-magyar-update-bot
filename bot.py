@@ -105,7 +105,7 @@ def post_discord(title, body, link, published):
         "description": body[:3900],
         "url": link or "https://store.steampowered.com/news/app/730",
         "color": 0xD32F2F,
-        "footer": {"text": "CS2 Magyar Szerver • AI-fordítás"},
+        "footer": {"text": "CS2 Magyar Szerver • Magyar fordítás"},
     }
     if published:
         try:
