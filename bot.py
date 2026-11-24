@@ -126,10 +126,12 @@ def post_discord(title, body, link, published):
     r.raise_for_status()
 
 
+
 def main():
-    for env_name in ("DISCORD_BOT_TOKEN", "DISCORD_CHANNEL_ID", "GEMINI_API_KEY"):
+    for env_name in ("DISCORD_BOT_TOKEN", "DISCORD_CHANNEL_ID"):
         if not os.environ.get(env_name):
             raise RuntimeError(f"Hiányzó környezeti változó: {env_name}")
+
 
     news = fetch_news()
     if not news:
