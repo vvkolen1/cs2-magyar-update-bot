@@ -7,9 +7,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 STEAM_NEWS_API = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/"
-
-]
-
 DISCORD_API = "https://discord.com/api/v10"
 STATE_PATH = Path("state.json")
 
